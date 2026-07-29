@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Nhánh build')
+    }
+
+    environment {
+        REGISTRY            = "repo.smartsolutionvn.com.vn/repository/ssvn-images"
+        PROJECT_NAME        = "platform"
+        COMPONENT           = "master-data-service"
+        SERVICE             = "master_data_service"                     // tên service trong docker-compose
+        DOCKER_COMPOSE_FILE = "/home/app/platform/deploy/docker-compose.yml"
+        IMAGE               = "${REGISTRY}/${PROJECT_NAME}/${COMPONENT}"
+    }
+
+    stages {
+        stage('Scan') {
+            steps { script { echo 'Start Building..' } }
+        }
+
+        stage('Build') {
+            environment {
+                REGISTRY_CREDS = credentials('2')
+            }
+            steps {
+                script {
+                    sh '''
+                        set -e
+                        echo -n "${REGISTRY_CREDS_PSW}" | docker login -u "${REGISTRY_CREDS_USR}" --password-stdin "${REGISTRY}"
+                        docker build -t ${IMAGE}:${BUILD_NUMBER} .
+                        docker tag ${IMAGE}:${BUILD_NUMBER} ${IMAGE}:latest
+                        docker push ${IMAGE}:${BUILD_NUMBER}
+                        docker push ${IMAGE}:latest
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy') {
+            environment {
+                REGISTRY_CREDS = credentials('2')
+                DEPLOY_SERVER  = credentials('3')
+            }
+            steps {
+                script {
+                    withCredentials([file(credentialsId: '4', variable: 'PRIVATE_KEY_FILE')]) {
+                        sh '''
+                            set -e
+                            ssh-keyscan -H "${DEPLOY_SERVER_PSW}" >> /var/jenkins_home/.ssh/known_hosts
+                            ssh -tt -i "${PRIVATE_KEY_FILE}" "${DEPLOY_SERVER_USR}@${DEPLOY_SERVER_PSW}" "
+                                yq e -i '.services.${SERVICE}.image=\\"${IMAGE}:${BUILD_NUMBER}\\"' ${DOCKER_COMPOSE_FILE} && \
+                                echo -n \\"${REGISTRY_CREDS_PSW}\\" | docker login -u \\"${REGISTRY_CREDS_USR}\\" --password-stdin \\"${REGISTRY}\\" && \
+                                docker compose -f ${DOCKER_COMPOSE_FILE} up -d ${SERVICE} && \
+                                docker image prune -af
+                            "
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always { cleanWs() }
+    }
+}

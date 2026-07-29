@@ -1,0 +1,110 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://mssql.smartsolutionvn.com.vn:34568/ssvn?currentSchema=master_data}
+    username: ${DB_USERNAME:ssvn}
+    password: ${DB_PASSWORD:Smart@2026}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 60000
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      leak-detection-threshold: 120000
+      pool-name: HikariPool-Template
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc.time_zone: Asia/Ho_Chi_Minh
+        enable_lazy_load_no_trans: true
+        format_sql: true
+    database: postgresql
+  security:
+    oauth2:
+      # 3 URI đều derive từ keycloak.base-url + keycloak.realm (khai báo 1 chỗ ở dưới).
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${keycloak.base-url}/realms/${keycloak.realm}/protocol/openid-connect/certs
+          issuer-uri: ${keycloak.base-url}/realms/${keycloak.realm}
+      client:
+        registration:
+          internal:
+            provider: keycloak
+            client-id: ${keycloak.client-id}
+            client-secret: ${keycloak.client-secret}
+            authorization-grant-type: client_credentials
+        provider:
+          keycloak:
+            token-uri: ${keycloak.base-url}/realms/${keycloak.realm}/protocol/openid-connect/token
+  jackson:
+    default-property-inclusion: non_null        # bỏ field null khi serialize
+    time-zone: Asia/Ho_Chi_Minh
+    deserialization:
+      fail-on-unknown-properties: false          # client gửi field lạ -> bỏ qua
+
+keycloak:
+  base-url: ${KEYCLOAK_BASE_URL:https://id.smartsolutionvn.com.vn}
+  realm: ${KEYCLOAK_REALM:ssvn}
+  client-id: ${KEYCLOAK_CLIENT_ID:ssvn-platform-internal}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET:VYwvwcvC7YF3ofLRZ7ESdjdfr0as5Tyf}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  tracing:
+    sampling:
+      probability: ${TRACE_SAMPLING:1.0}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  otlp:
+    metrics:
+      export:
+        enabled: false
+
+app:
+  security:
+    enabled: true
+  internal:
+    api-key-header: ${INTERNAL_API_KEY:SSV_PLATFORM}
+    base-url: ${SAMPLE_SERVICE_URL:http://localhost:8080}
+    enabled: true
+  clients:
+    sample-service:
+      base-url: ${SAMPLE_SERVICE_URL:http://localhost:8080}
+  admin:
+    refresh-ms: 60000
+  log:
+    max-payload-length: 1000
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    vn.com.ssv: ${LOG_LEVEL_APP:DEBUG}
+    org.springframework.web: INFO
+  pattern:
+    level: "%5p [req=%X{requestId:-} username=%X{username:-} traceId = %X{traceId:-}]"
+
+service:
+  admin-service:
+    context-path: admin
+    endpoints:
+      get-permission: /api/v1/role-permission/all
+
+

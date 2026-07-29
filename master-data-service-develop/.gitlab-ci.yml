@@ -1,0 +1,10 @@
+# Trigger Jenkins job khi push/merge vào develop (hoặc main).
+# Biến global (GitLab CI/CD settings): JENKINS_USER, JENKINS_API_TOKEN
+# Biến riêng của repo này: JENKINS_TRIGGER_URL
+#   = https://devci.smartsolutionvn.com.vn/job/<jenkins-job>/buildWithParameters?token=<TOKEN>&BRANCH_NAME=
+build:
+  stage: build
+  script:
+    - 'curl -X POST --user "$JENKINS_USER:$JENKINS_API_TOKEN" "$JENKINS_TRIGGER_URL$CI_COMMIT_BRANCH"'
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
